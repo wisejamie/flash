@@ -5,6 +5,7 @@ export default function UploadModal({ lectureId, onClose }) {
   const { ingestText, enqueueJob, jobs, lectures } = useStore();
   const [title, setTitle] = useState(lectures[lectureId]?.title || "");
   const [text, setText] = useState("");
+  const [file, setFile] = useState(null);
   const [working, setWorking] = useState(false);
 
   const job = useMemo(
@@ -15,13 +16,29 @@ export default function UploadModal({ lectureId, onClose }) {
     [jobs, lectureId]
   );
 
+  const handleFileChange = (e) => {
+    const f = e.target.files[0];
+    setFile(f || null);
+  };
+
   const onProcess = async () => {
-    if (!lectureId || !text.trim()) return;
+    if (!lectureId || (!text.trim() && !file)) return;
     setWorking(true);
     enqueueJob(lectureId);
-    await ingestText(lectureId, title || "Pasted Text", text);
-    setWorking(false);
-    onClose();
+    try {
+      await ingestText(
+        lectureId,
+        title || (file ? file.name : "Pasted Text"),
+        text,
+        file
+      );
+      onClose();
+    } catch (err) {
+      console.error("Upload failed:", err);
+      alert("Something went wrong generating flashcards.");
+    } finally {
+      setWorking(false);
+    }
   };
 
   return (
@@ -30,7 +47,7 @@ export default function UploadModal({ lectureId, onClose }) {
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Upload material</h3>
           <button
-            className="px-2 py-1 rounded-lg bg-neutral-800"
+            className="px-2 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700"
             onClick={onClose}
           >
             Close
@@ -45,26 +62,40 @@ export default function UploadModal({ lectureId, onClose }) {
         />
 
         <textarea
-          className="w-full h-56 px-3 py-2 rounded-xl bg-neutral-800"
-          placeholder="Paste text here (PDF support coming later)"
+          className="w-full h-48 px-3 py-2 rounded-xl bg-neutral-800"
+          placeholder="Paste text here or upload a PDF below"
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between">
+          <input
+            type="file"
+            accept="application/pdf"
+            onChange={handleFileChange}
+            className="text-sm text-neutral-300"
+          />
+          {file && (
+            <span className="text-xs text-neutral-400">
+              Selected: {file.name}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 mt-2">
           <button
-            disabled={!text || working}
+            disabled={(!text && !file) || working}
             onClick={onProcess}
             className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50"
           >
-            Generate flashcards
+            {working ? "Generating..." : "Generate flashcards"}
           </button>
 
           {job && (
             <div className="flex items-center gap-2 text-sm text-neutral-300">
               <div className="w-40 h-2 bg-neutral-800 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-indigo-500"
+                  className="h-full bg-indigo-500 transition-all duration-300"
                   style={{ width: `${Math.floor((job.progress || 0) * 100)}%` }}
                 />
               </div>

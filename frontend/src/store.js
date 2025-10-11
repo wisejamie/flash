@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { generateFlashcards } from "./lib/api";
 
 /***** Utilities *****/
 let _ctr = 0;
@@ -67,21 +68,24 @@ export const useStore = create()((set, get) => ({
       };
     }),
 
-  ingestText: async (lectureId, name, text) => {
+  ingestText: async (lectureId, name, text, file = null) => {
     const s = get();
     const jobId =
       Object.values(s.jobs).find(
         (j) => j.lectureId === lectureId && j.stage === "queued"
       )?.id || newId();
+
+    // Stage 1: mark job extracting
     set((st) => ({
       jobs: {
         ...st.jobs,
         [jobId]: { id: jobId, lectureId, stage: "extracting", progress: 0.2 },
       },
     }));
-    // Extract & chunk (simple heuristic)
+
+    // Stage 2: chunk and register text source
     const sourceId = newId();
-    const chunks = chunkText(text);
+    const chunks = text ? chunkText(text) : [];
     set((st) => {
       const L = st.lectures[lectureId];
       return {
@@ -91,7 +95,13 @@ export const useStore = create()((set, get) => ({
             ...L,
             sources: [
               ...L.sources,
-              { id: sourceId, kind: "text", name, text, chunks },
+              {
+                id: sourceId,
+                kind: file ? "file" : "text",
+                name,
+                text,
+                chunks,
+              },
             ],
           },
         },
@@ -102,54 +112,65 @@ export const useStore = create()((set, get) => ({
       };
     });
 
-    // Generate cards (mock LLM: parse term: definition lines & bullet patterns)
-    const generated = await generateCardsLocally(
-      chunks.map((c) => c.text).join("\n\n")
-    );
-    // Upsert
-    set((st) => {
-      const L = st.lectures[lectureId];
-      const existingByKey = new Map();
-      L.cardIds.forEach((cid) =>
-        existingByKey.set(normalizeTerm(st.cards[cid].term), st.cards[cid])
-      );
-      const newCards = {};
-      const newCardIds = [];
-      const updatedCards = { ...st.cards };
+    // Stage 3: generate flashcards via backend
+    try {
+      const result = await generateFlashcards({ text, file });
+      const generated = result.flashcards || [];
 
-      for (const row of generated) {
-        const key = normalizeTerm(row.term);
-        const prev = existingByKey.get(key);
-        if (prev) {
-          // update explanation immutably if longer
-          if (row.explanation.length > prev.explanation.length) {
-            updatedCards[prev.id] = { ...prev, explanation: row.explanation };
+      set((st) => {
+        const L = st.lectures[lectureId];
+        const existingByKey = new Map();
+        L.cardIds.forEach((cid) =>
+          existingByKey.set(normalizeTerm(st.cards[cid].term), st.cards[cid])
+        );
+        const newCards = {};
+        const newCardIds = [];
+        const updatedCards = { ...st.cards };
+
+        for (const row of generated) {
+          const key = normalizeTerm(row.term);
+          const prev = existingByKey.get(key);
+          if (prev) {
+            if (row.explanation.length > prev.explanation.length) {
+              updatedCards[prev.id] = { ...prev, explanation: row.explanation };
+            }
+          } else {
+            const id = newId();
+            newCards[id] = {
+              id,
+              lectureId,
+              term: row.term.trim(),
+              explanation: row.explanation.trim(),
+              stats: { views: 0, flips: 0 },
+            };
+            newCardIds.push(id);
           }
-        } else {
-          const id = newId();
-          newCards[id] = {
-            id,
-            lectureId,
-            term: row.term.trim(),
-            explanation: row.explanation.trim(),
-            stats: { views: 0, flips: 0 },
-          };
-          newCardIds.push(id);
         }
-      }
 
-      return {
-        cards: { ...updatedCards, ...newCards },
-        lectures: {
-          ...st.lectures,
-          [lectureId]: { ...L, cardIds: [...L.cardIds, ...newCardIds] },
-        },
+        return {
+          cards: { ...updatedCards, ...newCards },
+          lectures: {
+            ...st.lectures,
+            [lectureId]: { ...L, cardIds: [...L.cardIds, ...newCardIds] },
+          },
+          jobs: {
+            ...st.jobs,
+            [jobId]: { ...st.jobs[jobId], stage: "finalizing", progress: 0.9 },
+          },
+        };
+      });
+    } catch (err) {
+      console.error("Flashcard generation error:", err);
+      set((st) => ({
         jobs: {
           ...st.jobs,
-          [jobId]: { ...st.jobs[jobId], stage: "finalizing", progress: 0.9 },
+          [jobId]: { ...st.jobs[jobId], stage: "error", progress: 1 },
         },
-      };
-    });
+      }));
+      return;
+    }
+
+    // Stage 4: finalize
     set((st) => ({
       jobs: {
         ...st.jobs,

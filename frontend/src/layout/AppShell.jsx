@@ -38,7 +38,7 @@ export default function AppShell() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-600 text-transparent bg-clip-text">
-              Flashcarding
+              Flash
             </h1>
             <span className="hidden md:inline-block text-neutral-500">·</span>
             {activeSet ? (
