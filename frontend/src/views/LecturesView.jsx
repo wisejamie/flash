@@ -3,7 +3,7 @@ import { useStore } from "../store";
 import UploadModal from "../components/UploadModal";
 
 export default function LecturesView() {
-  const { ui, sets, lectures, addLecture } = useStore();
+  const { ui, sets, lectures, addLecture, deleteLecture } = useStore();
   const setObj = sets[ui.currentSetId];
   const [showUpload, setShowUpload] = useState(false);
   const [selectedLectureId, setSelectedLectureId] = useState(null);
@@ -32,31 +32,53 @@ export default function LecturesView() {
       </div>
 
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-        {setObj.lectureIds.map((lid) => (
-          <div
-            key={lid}
-            className={`p-3 rounded-xl border ${
-              selectedLectureId === lid
-                ? "border-indigo-500"
-                : "border-neutral-800"
-            } bg-neutral-900`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-semibold">{lectures[lid].title}</div>
-                <div className="text-xs text-neutral-400">
-                  {lectures[lid].cardIds.length} card(s)
+        {setObj.lectureIds.map((lid) => {
+          const L = lectures[lid];
+          return (
+            <div
+              key={lid}
+              className={`p-4 rounded-xl border transition-colors ${
+                selectedLectureId === lid
+                  ? "border-indigo-500 bg-neutral-800/60"
+                  : "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
+              } flex flex-col justify-between`}
+            >
+              {/* Lecture info */}
+              <div className="flex-1">
+                <div className="font-semibold text-neutral-100 truncate">
+                  {L.title || "Untitled Lecture"}
+                </div>
+                <div className="text-xs text-neutral-400 mt-1">
+                  {L.cardIds.length} card{L.cardIds.length !== 1 && "s"}
                 </div>
               </div>
-              <button
-                className="px-2 py-1 rounded-lg bg-neutral-800"
-                onClick={() => setSelectedLectureId(lid)}
-              >
-                Select
-              </button>
+
+              {/* Action buttons */}
+              <div className="flex justify-end gap-2 mt-3">
+                <button
+                  className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                    selectedLectureId === lid
+                      ? "bg-indigo-600 text-white hover:bg-indigo-500"
+                      : "bg-neutral-800 text-neutral-200 hover:bg-neutral-700"
+                  }`}
+                  onClick={() => setSelectedLectureId(lid)}
+                >
+                  {selectedLectureId === lid ? "Selected" : "Select"}
+                </button>
+
+                <button
+                  className="px-3 py-1.5 text-sm rounded-lg font-medium text-red-400 bg-neutral-800 hover:text-red-300 hover:bg-neutral-700 transition-colors"
+                  onClick={() => {
+                    if (confirm(`Delete lecture "${L.title}"?`))
+                      deleteLecture(lid);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {setObj.lectureIds.length === 0 && (
           <p className="text-neutral-400">No lectures yet. Add one.</p>
         )}

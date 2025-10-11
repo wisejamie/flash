@@ -8,8 +8,16 @@ import EvaluationView from "../views/EvaluationView";
 import HistoryView from "../views/HistoryView";
 
 export default function AppShell() {
-  const { sets, ui, createSet, setCurrentSet, setTab, exportJSON, importJSON } =
-    useStore();
+  const {
+    sets,
+    ui,
+    createSet,
+    setCurrentSet,
+    setTab,
+    exportJSON,
+    importJSON,
+    deleteSet,
+  } = useStore();
   const fileRef = useRef(null);
 
   const activeSet = ui.currentSetId ? sets[ui.currentSetId] : null;
@@ -127,6 +135,15 @@ export default function AppShell() {
                         <div className="text-xs text-neutral-400">
                           {s.lectureIds.length} lecture(s)
                         </div>
+                      </button>
+                      <button
+                        className="px-2 py-1 text-sm text-red-400 hover:text-red-300"
+                        onClick={() => {
+                          if (confirm(`Delete set "${s.title}"?`))
+                            deleteSet(s.id);
+                        }}
+                      >
+                        Delete
                       </button>
                     </li>
                   );

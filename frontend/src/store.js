@@ -313,6 +313,122 @@ export const useStore = create()((set, get) => ({
       };
     }),
 
+  /** --- MANAGEMENT ACTIONS --- **/
+
+  deleteSet: (setId) =>
+    set((st) => {
+      const { [setId]: _, ...restSets } = st.sets;
+      // Also remove all lectures/cards belonging to this set
+      const lecturesToRemove = Object.values(st.lectures).filter(
+        (l) => l.setId === setId
+      );
+      const lectureIds = lecturesToRemove.map((l) => l.id);
+      const cardsToRemove = Object.values(st.cards).filter((c) =>
+        lectureIds.includes(c.lectureId)
+      );
+      const cardIds = cardsToRemove.map((c) => c.id);
+      const newLectures = Object.fromEntries(
+        Object.entries(st.lectures).filter(([id]) => !lectureIds.includes(id))
+      );
+      const newCards = Object.fromEntries(
+        Object.entries(st.cards).filter(([id]) => !cardIds.includes(id))
+      );
+      return {
+        sets: restSets,
+        lectures: newLectures,
+        cards: newCards,
+        ui: {
+          ...st.ui,
+          currentSetId:
+            st.ui.currentSetId === setId ? null : st.ui.currentSetId,
+        },
+      };
+    }),
+
+  deleteLecture: (lectureId) =>
+    set((st) => {
+      const { [lectureId]: removed, ...restLectures } = st.lectures;
+      const cardsToRemove = Object.values(st.cards).filter(
+        (c) => c.lectureId === lectureId
+      );
+      const cardIds = cardsToRemove.map((c) => c.id);
+      const newCards = Object.fromEntries(
+        Object.entries(st.cards).filter(([id]) => !cardIds.includes(id))
+      );
+      const setId = removed?.setId;
+      const updatedSet = setId
+        ? {
+            ...st.sets[setId],
+            lectureIds: st.sets[setId].lectureIds.filter(
+              (id) => id !== lectureId
+            ),
+          }
+        : null;
+      return {
+        lectures: restLectures,
+        cards: newCards,
+        sets: setId ? { ...st.sets, [setId]: updatedSet } : st.sets,
+      };
+    }),
+
+  addCard: (lectureId, term, explanation) =>
+    set((s) => {
+      const id = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const newCard = {
+        id,
+        lectureId,
+        term: term.trim(),
+        explanation: explanation.trim(),
+        stats: { views: 0, flips: 0 },
+      };
+      return {
+        cards: { ...s.cards, [id]: newCard },
+        lectures: {
+          ...s.lectures,
+          [lectureId]: {
+            ...s.lectures[lectureId],
+            cardIds: [...(s.lectures[lectureId].cardIds || []), id],
+          },
+        },
+      };
+    }),
+
+  deleteCard: (cardId) =>
+    set((st) => {
+      const { [cardId]: removed, ...restCards } = st.cards;
+      const lectureId = removed?.lectureId;
+      const updatedLecture = lectureId
+        ? {
+            ...st.lectures[lectureId],
+            cardIds: st.lectures[lectureId].cardIds.filter(
+              (id) => id !== cardId
+            ),
+          }
+        : null;
+      return {
+        cards: restCards,
+        lectures: lectureId
+          ? { ...st.lectures, [lectureId]: updatedLecture }
+          : st.lectures,
+      };
+    }),
+
+  editCard: (cardId, newTerm, newExplanation) =>
+    set((st) => {
+      const card = st.cards[cardId];
+      if (!card) return {};
+      return {
+        cards: {
+          ...st.cards,
+          [cardId]: {
+            ...card,
+            term: newTerm.trim(),
+            explanation: newExplanation.trim(),
+          },
+        },
+      };
+    }),
+
   setTab: (tab) => set((s) => ({ ui: { ...s.ui, tab } })),
   setCurrentSet: (id) => set((s) => ({ ui: { ...s.ui, currentSetId: id } })),
 
