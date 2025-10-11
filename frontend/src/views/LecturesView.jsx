@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { useStore } from "../store";
 import UploadModal from "../components/UploadModal";
+import FlashcardEditorCard from "../components/FlashcardEditorCard";
+import AddFlashcardInline from "../components/AddFlashcardInline";
 
 export default function LecturesView() {
-  const { ui, sets, lectures, addLecture, deleteLecture } = useStore();
+  const { ui, sets, cards, lectures, addLecture, deleteLecture } = useStore();
   const setObj = sets[ui.currentSetId];
   const [showUpload, setShowUpload] = useState(false);
   const [selectedLectureId, setSelectedLectureId] = useState(null);
@@ -69,8 +71,10 @@ export default function LecturesView() {
                 <button
                   className="px-3 py-1.5 text-sm rounded-lg font-medium text-red-400 bg-neutral-800 hover:text-red-300 hover:bg-neutral-700 transition-colors"
                   onClick={() => {
-                    if (confirm(`Delete lecture "${L.title}"?`))
+                    if (confirm(`Delete lecture "${L.title}"?`)) {
                       deleteLecture(lid);
+                      if (selectedLectureId === lid) setSelectedLectureId(null);
+                    }
                   }}
                 >
                   Delete
@@ -83,6 +87,32 @@ export default function LecturesView() {
           <p className="text-neutral-400">No lectures yet. Add one.</p>
         )}
       </div>
+
+      {selectedLectureId && (
+        <div className="mt-6 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-neutral-400">
+              Editing lecture:{" "}
+              <span className="text-neutral-200 font-medium">
+                {lectures[selectedLectureId]?.title || "Untitled Lecture"}
+              </span>
+            </div>
+          </div>
+          <AddFlashcardInline lectureId={selectedLectureId} />
+
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {lectures[selectedLectureId]?.cardIds?.length ? (
+              lectures[selectedLectureId].cardIds.map((cid) => (
+                <FlashcardEditorCard key={cid} card={cards[cid]} />
+              ))
+            ) : (
+              <div className="col-span-full text-neutral-400 text-sm">
+                No flashcards yet. Click “Add flashcard” to create one.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showUpload && (
         <UploadModal
