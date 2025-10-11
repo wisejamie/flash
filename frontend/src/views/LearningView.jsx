@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useStore } from "../store";
 import ProgressBar from "../components/ProgressBar";
 import useKeyboard from "../hooks/useKeyboard";
+import ScopeSelect from "../components/ScopeSelect";
 
 export default function LearningView() {
   const {
@@ -29,8 +30,13 @@ export default function LearningView() {
   const [newTerm, setNewTerm] = useState("");
   const [newExp, setNewExp] = useState("");
 
-  const lectureScope = useMemo(() => setObj.lectureIds, [setObj]);
-  const start = () => startLearning(setObj.id, lectureScope);
+  const [scope, setScope] = useState("all");
+
+  const lectureScope = useMemo(
+    () => (scope === "all" ? setObj.lectureIds : scope),
+    [scope, setObj]
+  );
+  const start = () => startLearning(setObj.id, scope === "all" ? "all" : scope);
 
   const curCard = useMemo(() => {
     if (!run) return null;
@@ -92,13 +98,27 @@ export default function LearningView() {
 
   if (!run) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
+        {/* NEW: scope selector */}
+        <ScopeSelect
+          setObj={setObj}
+          value={scope}
+          onChange={setScope}
+          className="max-w-2xl"
+        />
         <button
-          disabled={setObj.lectureIds.length === 0}
+          disabled={
+            setObj.lectureIds.length === 0 ||
+            (Array.isArray(scope) && scope.length === 0)
+          }
           className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50"
           onClick={start}
         >
-          Start Learning (All Lectures)
+          {scope === "all"
+            ? "Start Learning (All Lectures)"
+            : `Start Learning (${
+                Array.isArray(scope) ? scope.length : 0
+              } selected)`}
         </button>
       </div>
     );

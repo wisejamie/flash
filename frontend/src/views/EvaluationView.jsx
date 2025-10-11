@@ -3,6 +3,7 @@ import { useStore } from "../store";
 import MCQPanel from "../components/MCQPanel";
 import SummaryPanel from "../components/SummaryPanel";
 import useKeyboard from "../hooks/useKeyboard";
+import ScopeSelect from "../components/ScopeSelect";
 
 export default function EvaluationView() {
   const { ui, sets, runs, startEvaluation, answerMCQ, finishEvaluation } =
@@ -11,8 +12,10 @@ export default function EvaluationView() {
   const run = ui.currentRunId ? runs.evaluation?.[ui.currentRunId] : null;
   const [cursor, setCursor] = useState(0);
   const [selected, setSelected] = useState(null);
+  const [scope, setScope] = useState("all"); // "all" | string[]
 
-  const start = () => startEvaluation(setObj.id, "all", 4);
+  const start = () =>
+    startEvaluation(setObj.id, scope === "all" ? "all" : scope, 4);
 
   const total = run?.items?.length ?? 0;
   const completed = !!run?.completedAt || (run && cursor >= total);
@@ -42,13 +45,26 @@ export default function EvaluationView() {
 
   if (!run) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
+        <ScopeSelect
+          setObj={setObj}
+          value={scope}
+          onChange={setScope}
+          className="max-w-2xl"
+        />
         <button
-          disabled={setObj.lectureIds.length === 0}
+          disabled={
+            setObj.lectureIds.length === 0 ||
+            (Array.isArray(scope) && scope.length === 0)
+          }
           className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50"
           onClick={start}
         >
-          Start Evaluation (All Lectures)
+          {scope === "all"
+            ? "Start Evaluation (All Lectures)"
+            : `Start Evaluation (${
+                Array.isArray(scope) ? scope.length : 0
+              } selected)`}
         </button>
       </div>
     );
