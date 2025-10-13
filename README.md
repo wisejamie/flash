@@ -7,7 +7,7 @@ Built with **React + Tailwind + Zustand** on the frontend and **FastAPI + OpenAI
 
 ## Features
 
-### 🔍 Smart Content Extraction
+### Smart Content Extraction
 
 - Upload **PDFs** or paste lecture **text**.
 - GPT automatically generates:
@@ -43,7 +43,7 @@ Built with **React + Tailwind + Zustand** on the frontend and **FastAPI + OpenAI
 
 ---
 
-## 🏗️ Tech Stack
+## Tech Stack
 
 | Layer          | Tech                               |
 | -------------- | ---------------------------------- |
