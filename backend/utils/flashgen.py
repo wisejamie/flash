@@ -25,6 +25,47 @@ def _dedupe(cards: List[Dict[str,str]]) -> List[Dict[str,str]]:
     return list(by.values())
 
 # ---------- Prompts ----------
+# ---------- Summary prompts ----------
+SUMMARY_SYSTEM = """
+You write a concise, exam-oriented overview of a lecture.
+Rules:
+- 1 paragraph (4–7 sentences). No bullet points.
+- Cover the major topics/themes and how they relate; do NOT explain every detail.
+- Emphasize scope and structure of what the lecture covers (what & why), not logistics/admin.
+- Output JSON only: {"summary": "one paragraph"}
+"""
+
+SUMMARY_USER = """
+Write the one-paragraph overview for the lecture below.
+
+Lecture text (may be truncated):
+\"\"\"{text}\"\"\"
+
+Return only JSON per the schema.
+"""
+
+def _summarize(text: str, model: str = "gpt-4.1-nano") -> str:
+    text = (text or "").strip()
+    if not text:
+        return ""
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SUMMARY_SYSTEM.strip()},
+            {"role": "user", "content": SUMMARY_USER.format(text=text[:12000])},
+        ],
+        temperature=0.2,
+        response_format={"type": "json_object"},
+    )
+    raw = resp.choices[0].message.content
+    try:
+        data = raw if isinstance(raw, dict) else json.loads(raw)
+        s = (data.get("summary") or "").strip()
+        return s
+    except Exception:
+        return ""
+
+
 ENUM_SYSTEM = """
 You list ONLY exam-worthy concept handles (content words) from a lecture.
 Rules:
@@ -51,7 +92,7 @@ EXPAND_SYSTEM = """
 You expand concept handles into concise flashcards.
 Rules:
 - For each concept, produce {"term":"...","explanation":"..."}.
-- Explanations are 1–2 sentences, precise, exam-focused, stand-alone.
+- Explanations are 1–2 sentences, precise, exam-focused, stand-alone. Should not include the term itself.
 - EXCLUDE admin/logistics/platforms and meta talk.
 - Output JSON ONLY: {"flashcards":[{"term":"...","explanation":"..."}]}
 """
@@ -68,13 +109,28 @@ Return only JSON per the schema.
 """
 
 # ---------- LLM calls ----------
-def _enumerate_concepts(text: str, exclude: Set[str], limit: int = 25, model: str = "gpt-4.1-nano") -> List[str]:
+def _enumerate_concepts(
+    text: str,
+    exclude: Set[str],
+    limit: int = 25,
+    model: str = "gpt-4.1-nano",
+    summary: str = ""
+) -> List[str]:
     exclude_list = sorted(list(exclude))
+    # Guidance-aware user payload
+    user_payload = ENUM_USER.format(
+        limit=limit,
+        exclude_list=exclude_list,
+        text=text[:12000],
+    )
+    if summary:
+        user_payload += f'\n\nGuidance (one-paragraph overview of the lecture):\n"""{summary}"""'
+
     resp = client.chat.completions.create(
         model=model,
         messages=[
             {"role":"system","content": ENUM_SYSTEM.strip()},
-            {"role":"user",  "content": ENUM_USER.format(limit=limit, exclude_list=exclude_list, text=text[:12000])},
+            {"role":"user",  "content": user_payload},
         ],
         temperature=0.2,
         response_format={"type":"json_object"},
@@ -83,7 +139,6 @@ def _enumerate_concepts(text: str, exclude: Set[str], limit: int = 25, model: st
     try:
         data = raw if isinstance(raw, dict) else json.loads(raw)
         concepts = [(c or "").strip() for c in data.get("concepts", []) if c and isinstance(c, str)]
-        # basic sanitation
         clean = []
         for c in concepts:
             if _norm_key(c) and c.lower() not in _ADMIN_TERMS:
@@ -92,9 +147,21 @@ def _enumerate_concepts(text: str, exclude: Set[str], limit: int = 25, model: st
     except Exception:
         return []
 
-def _expand_concepts(text: str, concepts: List[str], model: str = "gpt-4.1-nano") -> List[Dict[str,str]]:
+def _expand_concepts(
+    text: str,
+    concepts: List[str],
+    model: str = "gpt-4.1-nano",
+    summary: str = ""
+) -> List[Dict[str,str]]:
     if not concepts: return []
-    payload = EXPAND_USER.format(limit=len(concepts), concepts="\n".join(f"- {c}" for c in concepts), text=text[:12000])
+    payload = EXPAND_USER.format(
+        limit=len(concepts),
+        concepts="\n".join(f"- {c}" for c in concepts),
+        text=text[:12000],
+    )
+    if summary:
+        payload += f'\n\nGuidance (one-paragraph overview of the lecture):\n"""{summary}"""'
+
     resp = client.chat.completions.create(
         model=model,
         messages=[
@@ -118,6 +185,42 @@ def _expand_concepts(text: str, concepts: List[str], model: str = "gpt-4.1-nano"
     except Exception:
         return []
     return out
+
+def generate_flashcards_and_summary(
+    text: str,
+    iterations: int = 3,
+    enumerate_batch: int = 25,
+    expand_batch: int = 20,
+    model: str = "gpt-4.1-nano",
+) -> Dict[str, Any]:
+    """
+    Generates a one-paragraph summary first, then uses it as guidance to produce flashcards.
+    Returns: {"summary": str, "flashcards": [ ...pairs... ]}
+    """
+    print(text[:100])
+    text = (text or "").strip()
+    print("Generating summary...")
+    summary = _summarize(text, model=model)
+    print("Summary done. Generating flashcards...")
+
+    covered: Set[str] = set()
+    cards: List[Dict[str,str]] = []
+
+    for _round in range(iterations):
+        print(f"Round {_round+1}...")
+        candidates = _enumerate_concepts(text, exclude=covered, limit=enumerate_batch, model=model, summary=summary)
+        new_candidates = [c for c in candidates if _norm_key(c) not in {_norm_key(x) for x in covered}]
+        if not new_candidates:
+            break
+
+        batch = new_candidates[:expand_batch]
+        expanded = _expand_concepts(text, batch, model=model, summary=summary)
+        cards.extend(expanded)
+        for t in batch:
+            covered.add(t)
+    print("Flashcards done.")
+
+    return {"summary": summary, "flashcards": _dedupe(cards)}
 
 # ---------- Orchestrator (iterative, no sectioning) ----------
 def generate_flashcards_iterative(
@@ -166,12 +269,16 @@ def generate_flashcards_iterative_debug(
     report: Dict[str, Any] = {"rounds": [], "final": {}}
     text = (text or "").strip()
 
+    # NEW: summary first
+    summary = _summarize(text, model=model)
+    report["summary"] = summary
+
     covered: Set[str] = set()
     cards: List[Dict[str,str]] = []
 
     for r in range(iterations):
         round_info: Dict[str, Any] = {"round": r+1}
-        candidates = _enumerate_concepts(text, exclude=covered, limit=enumerate_batch, model=model)
+        candidates = _enumerate_concepts(text, exclude=covered, limit=enumerate_batch, model=model, summary=summary)
         round_info["enumerated"] = candidates
 
         new_candidates = [c for c in candidates if _norm_key(c) not in {_norm_key(x) for x in covered}]
@@ -184,7 +291,7 @@ def generate_flashcards_iterative_debug(
         batch = new_candidates[:expand_batch]
         round_info["expanded_batch"] = batch
 
-        expanded = _expand_concepts(text, batch, model=model)
+        expanded = _expand_concepts(text, batch, model=model, summary=summary)
         round_info["expanded_count"] = len(expanded)
         round_info["expanded_sample"] = expanded[:8]
 

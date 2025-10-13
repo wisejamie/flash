@@ -90,6 +90,17 @@ export default function LecturesView() {
 
       {selectedLectureId && (
         <div className="mt-6 space-y-3">
+          {/* Lecture Overview */}
+          {lectures[selectedLectureId]?.summary && (
+            <div className="p-4 rounded-xl border border-neutral-800 bg-neutral-900">
+              <div className="text-xs uppercase tracking-wide text-neutral-400 mb-2">
+                Lecture Overview
+              </div>
+              <p className="text-neutral-200 leading-relaxed">
+                {lectures[selectedLectureId].summary}
+              </p>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <div className="text-sm text-neutral-400">
               Editing lecture:{" "}

@@ -5,7 +5,7 @@ export async function generateFlashcards({ text, file }) {
   if (text) formData.append("text", text);
   if (file) formData.append("file", file);
 
-  const res = await fetch(`${API_BASE}/generate-flashcards`, {
+  const res = await fetch(`${API_BASE}/generate-flashcards-with-summary`, {
     method: "POST",
     body: formData,
   });

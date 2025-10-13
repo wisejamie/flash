@@ -31,12 +31,16 @@ export default function LearningView() {
   const [newExp, setNewExp] = useState("");
 
   const [scope, setScope] = useState("all");
+  const [shuffle, setShuffle] = useState(true);
 
   const lectureScope = useMemo(
     () => (scope === "all" ? setObj.lectureIds : scope),
     [scope, setObj]
   );
-  const start = () => startLearning(setObj.id, scope === "all" ? "all" : scope);
+  const start = () =>
+    startLearning(setObj.id, scope === "all" ? "all" : scope, {
+      shuffleOrder: !!shuffle,
+    });
 
   const curCard = useMemo(() => {
     if (!run) return null;
@@ -106,6 +110,15 @@ export default function LearningView() {
           onChange={setScope}
           className="max-w-2xl"
         />
+        <label className="flex items-center gap-2 text-sm text-neutral-300">
+          <input
+            type="checkbox"
+            className="accent-indigo-600"
+            checked={shuffle}
+            onChange={(e) => setShuffle(e.target.checked)}
+          />
+          Shuffle order
+        </label>
         <button
           disabled={
             setObj.lectureIds.length === 0 ||

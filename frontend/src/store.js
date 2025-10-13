@@ -45,7 +45,7 @@ export const useStore = create()((set, get) => ({
       return {
         lectures: {
           ...s.lectures,
-          [id]: { id, setId, title, sources: [], cardIds: [] },
+          [id]: { id, setId, title, sources: [], cardIds: [], summary: "" },
         },
         sets: {
           ...s.sets,
@@ -68,7 +68,12 @@ export const useStore = create()((set, get) => ({
       };
     }),
 
-  ingestText: async (lectureId, name, text, file = null) => {
+  // ingestText: async (lectureId, name, text, file = null) => {
+  ingestText: async (
+    lectureId,
+    name,
+    payload /* { text?: string, file?: File } */
+  ) => {
     const s = get();
     const jobId =
       Object.values(s.jobs).find(
@@ -85,7 +90,8 @@ export const useStore = create()((set, get) => ({
 
     // Stage 2: chunk and register text source
     const sourceId = newId();
-    const chunks = text ? chunkText(text) : [];
+    const isFile = !!payload?.file;
+    const chunks = payload?.text ? chunkText(payload.text) : [];
     set((st) => {
       const L = st.lectures[lectureId];
       return {
@@ -95,13 +101,21 @@ export const useStore = create()((set, get) => ({
             ...L,
             sources: [
               ...L.sources,
-              {
-                id: sourceId,
-                kind: file ? "file" : "text",
-                name,
-                text,
-                chunks,
-              },
+              isFile
+                ? {
+                    id: sourceId,
+                    kind: "pdf",
+                    name: name || payload?.file?.name || "Uploaded PDF",
+                    text: "",
+                    chunks: [],
+                  }
+                : {
+                    id: sourceId,
+                    kind: "text",
+                    name,
+                    text: payload?.text || "",
+                    chunks,
+                  },
             ],
           },
         },
@@ -114,8 +128,18 @@ export const useStore = create()((set, get) => ({
 
     // Stage 3: generate flashcards via backend
     try {
-      const result = await generateFlashcards({ text, file });
-      const generated = result.flashcards || [];
+      // Prefer file if provided; otherwise use original pasted text (not just chunk join)
+      const input = payload?.file
+        ? { file: payload.file }
+        : {
+            text:
+              (payload?.text || "").trim() ||
+              chunks.map((c) => c.text).join("\n\n"),
+          };
+
+      // Backend returns { flashcards, summary }
+      const { flashcards: generated = [], summary = "" } =
+        (await generateFlashcards(input)) || {};
 
       set((st) => {
         const L = st.lectures[lectureId];
@@ -151,7 +175,11 @@ export const useStore = create()((set, get) => ({
           cards: { ...updatedCards, ...newCards },
           lectures: {
             ...st.lectures,
-            [lectureId]: { ...L, cardIds: [...L.cardIds, ...newCardIds] },
+            [lectureId]: {
+              ...L,
+              cardIds: [...L.cardIds, ...newCardIds],
+              summary: summary || L.summary || "",
+            },
           },
           jobs: {
             ...st.jobs,
@@ -179,14 +207,17 @@ export const useStore = create()((set, get) => ({
     }));
   },
 
-  startLearning: (setId, lectureScope) =>
+  startLearning: (setId, lectureScope, opts = {}) =>
     set((st) => {
+      const { shuffleOrder = false } =
+        typeof opts === "boolean" ? { shuffleOrder: opts } : opts || {};
       const runId = newId();
       const lectureIds =
         lectureScope === "all" ? st.sets[setId].lectureIds : lectureScope;
       const cardIds = lectureIds.flatMap(
         (lid) => st.lectures[lid]?.cardIds || []
       );
+      const order = shuffleOrder ? shuffle(cardIds) : cardIds;
       return {
         runs: {
           ...st.runs,
@@ -197,7 +228,7 @@ export const useStore = create()((set, get) => ({
               setId,
               lectureScope,
               createdAt: now(),
-              order: cardIds,
+              order,
               cursor: 0,
               events: [],
             },
@@ -246,15 +277,18 @@ export const useStore = create()((set, get) => ({
       };
     }),
 
-  startEvaluation: (setId, lectureScope, nOptions = 4) =>
+  startEvaluation: (setId, lectureScope, nOptions = 4, opts = {}) =>
     set((st) => {
+      const { shuffleItems = true } =
+        typeof opts === "boolean" ? { shuffleItems: opts } : opts || {};
       const runId = newId();
       const lectureIds =
         lectureScope === "all" ? st.sets[setId].lectureIds : lectureScope;
       const cardIds = lectureIds.flatMap(
         (lid) => st.lectures[lid]?.cardIds || []
       );
-      const items = makeEvaluationItems(cardIds, st.cards, nOptions);
+      let items = makeEvaluationItems(cardIds, st.cards, nOptions);
+      if (shuffleItems) items = shuffle(items);
       return {
         runs: {
           ...st.runs,

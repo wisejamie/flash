@@ -26,12 +26,10 @@ export default function UploadModal({ lectureId, onClose }) {
     setWorking(true);
     enqueueJob(lectureId);
     try {
-      await ingestText(
-        lectureId,
-        title || (file ? file.name : "Pasted Text"),
+      await ingestText(lectureId, title || file?.name || "Material", {
         text,
-        file
-      );
+        file,
+      });
       onClose();
     } catch (err) {
       console.error("Upload failed:", err);
@@ -68,17 +66,18 @@ export default function UploadModal({ lectureId, onClose }) {
           onChange={(e) => setText(e.target.value)}
         />
 
-        <div className="flex items-center justify-between">
-          <input
-            type="file"
-            accept="application/pdf"
-            onChange={handleFileChange}
-            className="text-sm text-neutral-300"
-          />
+        <div className="flex items-center justify-between gap-3">
+          <label className="text-sm text-neutral-300">
+            Or upload PDF:
+            <input
+              type="file"
+              accept="application/pdf"
+              className="ml-3 text-sm"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+            />
+          </label>
           {file && (
-            <span className="text-xs text-neutral-400">
-              Selected: {file.name}
-            </span>
+            <div className="text-xs text-neutral-400 truncate">{file.name}</div>
           )}
         </div>
 

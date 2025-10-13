@@ -13,9 +13,12 @@ export default function EvaluationView() {
   const [cursor, setCursor] = useState(0);
   const [selected, setSelected] = useState(null);
   const [scope, setScope] = useState("all"); // "all" | string[]
+  const [shuffle, setShuffle] = useState(true);
 
   const start = () =>
-    startEvaluation(setObj.id, scope === "all" ? "all" : scope, 4);
+    startEvaluation(setObj.id, scope === "all" ? "all" : scope, 4, {
+      shuffleItems: !!shuffle,
+    });
 
   const total = run?.items?.length ?? 0;
   const completed = !!run?.completedAt || (run && cursor >= total);
@@ -52,6 +55,15 @@ export default function EvaluationView() {
           onChange={setScope}
           className="max-w-2xl"
         />
+        <label className="flex items-center gap-2 text-sm text-neutral-300">
+          <input
+            type="checkbox"
+            className="accent-indigo-600"
+            checked={shuffle}
+            onChange={(e) => setShuffle(e.target.checked)}
+          />
+          Shuffle questions
+        </label>
         <button
           disabled={
             setObj.lectureIds.length === 0 ||
