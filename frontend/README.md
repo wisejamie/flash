@@ -1,16 +1,56 @@
-# React + Vite
+# Flash — AI-Powered Flashcard Generator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Flash** is an interactive flashcard learning app that automatically generates study cards and summaries from lecture notes or PDFs using GPT.  
+Built with **React + Tailwind + Zustand** on the frontend and **FastAPI + OpenAI** on the backend, it combines intelligent content extraction with an engaging learning and testing experience.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## React Compiler
+### 🔍 Smart Content Extraction
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Upload **PDFs** or paste lecture **text**.
+- GPT automatically generates:
+  - **Flashcards** (term–definition pairs)
+  - **One-paragraph lecture summary**
+- Ignores admin/logistical content (e.g. “assignment”, “syllabus”, etc.)
 
-## Expanding the ESLint configuration
+### Organized Learning
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- Group flashcards into **Sets** and **Lectures**
+- **Edit**, **delete**, or **add** cards manually
+- Learn with an adaptive flip-card interface
+
+### Evaluation Mode
+
+- Multiple-choice quizzes generated from your flashcards
+- Track correctness and performance by lecture
+- Option to **shuffle** question order
+
+### Learning Mode
+
+- Review flashcards one by one with keyboard controls:
+  - **Space** — flip card
+  - **← / →** — previous / next
+- Shuffle mode for varied review sessions
+- Tracks viewing, flipping, and performance stats
+
+### Import & Export
+
+- Export all sets, lectures, and flashcards as a `.json` file
+- Re-import at any time to restore progress or share collections
+- Preserves learning history, performance, and summaries
+
+---
+
+## 🏗️ Tech Stack
+
+| Layer          | Tech                               |
+| -------------- | ---------------------------------- |
+| Frontend       | React, Zustand, TailwindCSS, Vite  |
+| Backend        | FastAPI (Python 3.9+), Uvicorn     |
+| AI Integration | OpenAI GPT models (`gpt-4.1-nano`) |
+| File Parsing   | PDF text extraction utilities      |
+| Storage        | In-memory Zustand store            |
+
+---
