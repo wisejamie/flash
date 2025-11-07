@@ -20,6 +20,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(flashcards_router, prefix="/api")
+
 @app.get("/")
 def root():
     return {"status": "ok", "message": "Flashcard backend running"}
